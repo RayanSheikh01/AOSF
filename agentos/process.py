@@ -13,9 +13,16 @@ class AgentState(Enum):
 
 @dataclass
 class StepResult:
-    kind = ["continue", "yield", "block", "done"]
+    kind = ["continue", "yield", "block", "done"] # "continue" means the agent can keep running, "yield" means it voluntarily yields the CPU, "block" means it is waiting on I/O or a syscall, "done" means it has completed execution
     # optional syscall payload. Returned by an agent step()
     payload: Optional[dict] = None
+    
+    def __init__(self, kind: str, payload: Optional[dict] = None):
+        if kind not in self.kind:
+            raise ValueError(f"Invalid StepResult kind: {kind}")
+        self.kind = kind
+        self.payload = payload
+    
     
 @dataclass
 class AgentControlBlock:
