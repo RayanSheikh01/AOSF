@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+agentos/__init__.py
+agentos/config.py
+agentos/errors.py
+agentos/process.py
+agentos.egg-info/PKG-INFO
+agentos.egg-info/SOURCES.txt
+agentos.egg-info/dependency_links.txt
+agentos.egg-info/requires.txt
+agentos.egg-info/top_level.txt
+tests/test_process.py

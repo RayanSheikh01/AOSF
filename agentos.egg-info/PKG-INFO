@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: agentos
+Version: 0.1.0
+Summary: A kernel-style operating layer for a pool of local LLM-backed agents
+Requires-Python: >=3.11
+Requires-Dist: ollama>=0.4
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Provides-Extra: monitor
+Requires-Dist: rich; extra == "monitor"

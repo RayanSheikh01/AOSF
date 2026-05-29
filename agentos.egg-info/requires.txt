@@ -1,0 +1,8 @@
+ollama>=0.4
+
+[dev]
+pytest
+pytest-asyncio
+
+[monitor]
+rich
