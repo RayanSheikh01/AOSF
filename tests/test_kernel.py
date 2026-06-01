@@ -40,4 +40,17 @@ def test_kernel_spawn_and_run():
     
     
     
+def test_monitor_snapshot():
+    kernel_config = {"cores": 1, "boost_interval": 10, "token_cost_usd": 0.0001}
+    kernel = Kernel(config=kernel_config, scheduler_policy=MockSchedulerPolicy())
     
+    # Spawn a mock agent
+    pid = kernel.spawn(behavior=None, priority=5, capabilities=[], token_budget=50_000)
+    
+    # Create a monitor and take a snapshot
+    from agentos.monitor import Monitor
+    monitor = Monitor(kernel)
+    snapshot = monitor.snapshot()
+    
+    # Check that the snapshot contains the expected information
+    assert f"{pid:3} | READY" in snapshot
