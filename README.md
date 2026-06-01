@@ -71,10 +71,12 @@ Example output:
 [findings:4] Ocean tides are caused by the gravitational pull of the Moon and the Sun...
 
 === monitor.snapshot() ===
-PID | State   | Priority | Tokens Used/Budget | Cost USD | Mailbox Depth
-----|---------|----------|--------------------|----------|--------------
-  1 | TERMINATED |        2 | 0/           20000 | $0.0000 |             0
-  2 | TERMINATED |        2 | 77/           10000 | $0.0077 |             0
-  3 | TERMINATED |        2 | 80/           10000 | $0.0080 |             0
-  4 | TERMINATED |        2 | 73/           10000 | $0.0073 |             0
+┏━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ PID ┃ State      ┃ Priority ┃ Tokens Used/Budget ┃ Cost USD ┃ Mailbox Depth ┃
+┡━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ 1   │ TERMINATED │ 2        │ 0/20000            │ $0.0000  │ 0             │
+│ 2   │ TERMINATED │ 2        │ 77/10000           │ $0.0077  │ 0             │
+│ 3   │ TERMINATED │ 2        │ 80/10000           │ $0.0080  │ 0             │
+│ 4   │ TERMINATED │ 2        │ 73/10000           │ $0.0073  │ 0             │
+└─────┴────────────┴──────────┴────────────────────┴──────────┴───────────────┘
 ```
