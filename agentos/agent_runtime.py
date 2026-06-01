@@ -4,6 +4,7 @@ from enum import Enum
 from agentos.process import StepResult
 
 from agentos.process import StepResult
+from agentos.providers import LLMProvider, LLMResponse
 
     
 
@@ -29,4 +30,13 @@ class MockAgent:
         
     
     
+class LLMAgent(LLMProvider):
+    name = "llm_agent"
+    description = "LLM Agent for testing"
     
+    async def chat(self, messages: list[dict[str, str]], model) -> LLMResponse:
+        return LLMResponse(
+            text="This is a response from the LLM agent.",
+            prompt_tokens=15,
+            completion_tokens=10
+        )
