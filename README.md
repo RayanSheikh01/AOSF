@@ -26,8 +26,9 @@ without touching the kernel.
 
 ## Status
 
-Early development. Build order and design live in
-[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+Core kernel runs end-to-end: MLFQ scheduler, capability-gated syscalls, IPC
+mailboxes, shared store, token-budget accounting, and a `ps`/`top`-style monitor.
+Build order and design live in [imp_plan.md](imp_plan.md).
 
 ## Setup
 
@@ -43,4 +44,37 @@ The full test suite runs without Ollama — the kernel is exercised by `MockAgen
 
 ```bash
 pytest -q
+```
+
+## Live demo
+
+[`examples/research_pool.py`](examples/research_pool.py) is a real Ollama run: a
+**coordinator** agent spawns one **worker** per subtopic, delegates each task over IPC,
+and the workers share their answers back through the kernel's shared store. It prints the
+findings and `kernel.monitor.snapshot()`.
+
+```bash
+pip install -e .          # so `import agentos` resolves outside pytest
+ollama pull llama3.2      # one-time; or use any local model
+python examples/research_pool.py
+```
+
+It skips with a clear message if no Ollama server / model is available, so it is safe to
+run (and is collected by `pytest`) on machines without a model pulled.
+
+Example output:
+
+```
+=== Research findings (shared via the store) ===
+[findings:2] Mitochondria generate energy through cellular respiration, producing ATP...
+[findings:3] The sky appears blue because air molecules scatter shorter blue wavelengths...
+[findings:4] Ocean tides are caused by the gravitational pull of the Moon and the Sun...
+
+=== monitor.snapshot() ===
+PID | State   | Priority | Tokens Used/Budget | Cost USD | Mailbox Depth
+----|---------|----------|--------------------|----------|--------------
+  1 | TERMINATED |        2 | 0/           20000 | $0.0000 |             0
+  2 | TERMINATED |        2 | 77/           10000 | $0.0077 |             0
+  3 | TERMINATED |        2 | 80/           10000 | $0.0080 |             0
+  4 | TERMINATED |        2 | 73/           10000 | $0.0073 |             0
 ```

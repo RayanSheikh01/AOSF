@@ -15,7 +15,7 @@ class MockAgent:
     def __init__(self):
         self.step_count = 0
         
-    async def step(self) -> StepResult:
+    async def step(self, ctx=None) -> StepResult:
         result = self.results[self.step_count]
         self.step_count += 1
         if result == self.State.READY:

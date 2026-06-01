@@ -12,7 +12,7 @@ class Monitor:
         for pid, acb in self.kernel.agent_control_blocks.items():
             state = acb.state.name
             priority = acb.priority
-            tokens_used = acb.token_budget - acb.token_budget  # Placeholder, as we don't track used tokens separately in this implementation
+            tokens_used = acb.tokens_used
             tokens_budget = acb.token_budget
             cost_usd = tokens_used * self.kernel.config.get("token_cost_usd", 0.0001)  # Example cost calculation
             mailbox_depth = len(self.kernel.inboxes[pid])

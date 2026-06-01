@@ -5,6 +5,8 @@ from collections import deque
 
 from agentos.process import Agent, AgentControlBlock, AgentState
 from agentos.scheduler import SchedulerPolicy
+from agentos.memory.store import SharedStore
+from agentos.monitor import Monitor
 
 
 class Kernel:
@@ -23,6 +25,11 @@ class Kernel:
         # Memory state: address -> bytearray block
         self.memory: dict[int, bytearray] = {}
         self.next_address = 0x1000
+
+        # Shared key/value store (named segments) for cross-agent findings.
+        self.store = SharedStore()
+        # ps/top-style live view over the PCB table.
+        self.monitor = Monitor(self)
 
     def spawn(self, behavior, priority, capabilities, token_budget) -> int:
         pid = self.next_pid
@@ -43,6 +50,9 @@ class Kernel:
         return pid
     
     def run(self, until_idle=True):
+       # Local import avoids a circular import: syscalls.py imports Kernel.
+       from agentos.syscalls import SyscallContext
+
        cores = self.config.get("cores", 1)
        boost_interval = self.config.get("boost_interval", 20)
        steps = 0
@@ -58,7 +68,9 @@ class Kernel:
                    else:
                        continue
                agent = self.agents[next_acb.pid]
-               step_result = asyncio.run(agent.behavior.step())
+               # Hand the running agent its kernel interface for this step.
+               ctx = SyscallContext(pid=next_acb.pid, kernel_ref=self)
+               step_result = asyncio.run(agent.behavior.step(ctx))
                if step_result.kind == "continue":
                    self.scheduler_policy.on_quantum_expired(next_acb)
                elif step_result.kind == "yield":
