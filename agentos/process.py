@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic.dataclasses import dataclass
 from typing import Optional
 
-class AgentState(Enum):
+class AgentState(str, Enum):
     NEW = "new"
     READY = "ready"
     RUNNING = "running"
@@ -35,12 +35,7 @@ class AgentControlBlock:
     capabilities: list[str] = field(default_factory=list)
     steps_run: int = 0
     cost_usd: float = 0.0
-    
-    def __init__(self, pid: int, parent_pid: Optional[int] = None, priority: int = 3):
-        self.pid = pid
-        self.parent_pid = parent_pid
-        self.priority = priority
-        
+
     def transition_state(self, new_state: AgentState):
         if self.state == AgentState.NEW and new_state != AgentState.READY:
             raise ValueError(f"Invalid state transition: {self.state} can only transition to READY")

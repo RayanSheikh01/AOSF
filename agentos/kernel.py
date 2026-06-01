@@ -1,31 +1,44 @@
-    
+
+
+from collections import deque
 
 from agentos.process import Agent, AgentControlBlock, AgentState
 from agentos.scheduler import SchedulerPolicy
 
 
 class Kernel:
-    
+
     def __init__(self, config, scheduler_policy: SchedulerPolicy):
         self.config = config
         self.scheduler_policy = scheduler_policy
         self.agents: dict[int, Agent] = {}
         self.agent_control_blocks: dict[int, AgentControlBlock] = {}
         self.next_pid = 1
-    
-    
+
+        # IPC state
+        self.inboxes: dict[int, deque] = {}
+        self.topics: dict[str, set[int]] = {}
+
+        # Memory state: address -> bytearray block
+        self.memory: dict[int, bytearray] = {}
+        self.next_address = 0x1000
+
     def spawn(self, behavior, priority, capabilities, token_budget) -> int:
         pid = self.next_pid
         self.next_pid += 1
-        
+
         acb = AgentControlBlock(pid=pid, priority=priority, capabilities=capabilities, token_budget=token_budget)
         agent = Agent(behavior=behavior, acb=acb)
-        
+
         self.agents[pid] = agent
         self.agent_control_blocks[pid] = acb
-        
-        self.scheduler_policy.on_ready(acb)
-        
+        self.inboxes[pid] = deque()
+
+        # NEW -> READY so the agent becomes schedulable / can later exit.
+        acb.transition_state(AgentState.READY)
+        if self.scheduler_policy is not None:
+            self.scheduler_policy.on_ready(acb)
+
         return pid
     
     def run(self, until_idle=True):
