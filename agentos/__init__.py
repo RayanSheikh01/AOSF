@@ -10,3 +10,11 @@ Public exports are wired up incrementally as subsystems land (see IMPLEMENTATION
 __version__ = "0.1.0"
 
 __all__ = ["__version__"]
+
+# exports: Kernel, LLMAgent, MockAgent, Tool, ToolRegistry, KernelConfig, error types.
+
+from .kernel import Kernel
+from .agent_runtime import LLMAgent, MockAgent
+from .tools import Tool, ToolRegistry
+from .config import KernelConfig
+from .errors import KernelError, CapabilityError, OutOfTokensError, NoSuchAgentError, SegmentError

@@ -1,5 +1,6 @@
 
 
+import asyncio
 from collections import deque
 
 from agentos.process import Agent, AgentControlBlock, AgentState
@@ -57,15 +58,17 @@ class Kernel:
                    else:
                        continue
                agent = self.agents[next_acb.pid]
-               step_result = agent.behavior
+               step_result = asyncio.run(agent.behavior.step())
                if step_result.kind == "continue":
                    self.scheduler_policy.on_quantum_expired(next_acb)
                elif step_result.kind == "yield":
                    self.scheduler_policy.on_yield(next_acb)
                elif step_result.kind == "block":
+                   # No real I/O wake path exists yet; re-ready the agent so a
+                   # mock workload can still make progress toward "done".
                    self.scheduler_policy.on_block(next_acb)
+                   self.scheduler_policy.on_yield(next_acb)
                elif step_result.kind == "done":
-                   self.scheduler_policy.pick_next(list(self.agent_control_blocks.values()))
                    next_acb.transition_state(AgentState.TERMINATED)
                    
                 

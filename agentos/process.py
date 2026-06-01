@@ -1,7 +1,7 @@
 from dataclasses import field
 from enum import Enum
 from pydantic.dataclasses import dataclass
-from typing import Optional
+from typing import ClassVar, Optional
 
 class AgentState(str, Enum):
     NEW = "new"
@@ -13,15 +13,16 @@ class AgentState(str, Enum):
 
 @dataclass
 class StepResult:
-    kind = ["continue", "yield", "block", "done"] # "continue" means the agent can keep running, "yield" means it voluntarily yields the CPU, "block" means it is waiting on I/O or a syscall, "done" means it has completed execution
+    # "continue" = agent can keep running, "yield" = voluntarily yields the CPU,
+    # "block" = waiting on I/O or a syscall, "done" = completed execution.
+    VALID_KINDS: ClassVar[list[str]] = ["continue", "yield", "block", "done"]
+    kind: str
     # optional syscall payload. Returned by an agent step()
     payload: Optional[dict] = None
-    
-    def __init__(self, kind: str, payload: Optional[dict] = None):
-        if kind not in self.kind:
-            raise ValueError(f"Invalid StepResult kind: {kind}")
-        self.kind = kind
-        self.payload = payload
+
+    def __post_init__(self):
+        if self.kind not in self.VALID_KINDS:
+            raise ValueError(f"Invalid StepResult kind: {self.kind}")
     
     
 @dataclass
