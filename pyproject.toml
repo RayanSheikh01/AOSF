@@ -7,11 +7,12 @@ name = "agentos"
 version = "0.1.0"
 description = "A kernel-style operating layer for a pool of local LLM-backed agents"
 requires-python = ">=3.11"
-dependencies = ["ollama>=0.4"]
+dependencies = ["ollama>=0.4", "pydantic>=2"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio"]
+dev = ["pytest", "pytest-asyncio", "httpx"]
 monitor = ["rich"]
+web = ["fastapi", "uvicorn[standard]"]
 
 [tool.setuptools.packages.find]
 include = ["agentos*"]

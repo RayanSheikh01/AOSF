@@ -1,8 +1,14 @@
 ollama>=0.4
+pydantic>=2
 
 [dev]
 pytest
 pytest-asyncio
+httpx
 
 [monitor]
 rich
+
+[web]
+fastapi
+uvicorn[standard]
