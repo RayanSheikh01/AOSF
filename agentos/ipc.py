@@ -42,6 +42,11 @@ class Broker:
         pids = self.topics.setdefault(topic, set())
         pids.add(pid)
         
+    def spawn(self, pid: int):
+        if pid in self.mailboxes:
+            raise ValueError(f"PID {pid} already has a mailbox")
+        self.mailboxes[pid] = Mailbox()
+        
 
 
         

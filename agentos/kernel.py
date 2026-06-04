@@ -3,6 +3,7 @@
 import asyncio
 from collections import deque
 
+from agentos.ipc import Broker
 from agentos.process import Agent, AgentControlBlock, AgentState
 from agentos.scheduler import SchedulerPolicy
 from agentos.memory.store import SharedStore
@@ -19,8 +20,8 @@ class Kernel:
         self.next_pid = 1
 
         # IPC state
-        self.inboxes: dict[int, deque] = {}
-        self.topics: dict[str, set[int]] = {}
+        self.broker = Broker()
+        
 
         # Memory state: address -> bytearray block
         self.memory: dict[int, bytearray] = {}
@@ -40,7 +41,7 @@ class Kernel:
 
         self.agents[pid] = agent
         self.agent_control_blocks[pid] = acb
-        self.inboxes[pid] = deque()
+        self.broker.spawn(pid)
 
         # NEW -> READY so the agent becomes schedulable / can later exit.
         acb.transition_state(AgentState.READY)
@@ -82,5 +83,5 @@ class Kernel:
                    self.scheduler_policy.on_yield(next_acb)
                elif step_result.kind == "done":
                    next_acb.transition_state(AgentState.TERMINATED)
-                   
+                   self.broker.spawn(next_acb.pid)
                 
