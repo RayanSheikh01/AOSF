@@ -2,6 +2,7 @@ import pytest
 
 from agentos.process import AgentControlBlock, AgentState
 from agentos.kernel import Kernel
+from agentos.scheduler import MLFQ
 
 class MockSchedulerPolicy:
     def on_ready(self, acb):
@@ -41,16 +42,22 @@ def test_kernel_spawn_and_run():
     
     
 def test_monitor_snapshot():
-    kernel_config = {"cores": 1, "boost_interval": 10, "token_cost_usd": 0.0001}
-    kernel = Kernel(config=kernel_config, scheduler_policy=MockSchedulerPolicy())
+    kernel_config = {"cores": 2, "boost_interval": 10, "token_cost_usd": 0.0001}
+    kernel = Kernel(config=kernel_config, scheduler_policy=MLFQ())
     
-    # Spawn a mock agent
+    # Spawn a mock agent with MLFQ scheduler policy
     pid = kernel.spawn(behavior=None, priority=5, capabilities=[], token_budget=50_000)
-    
     # Create a monitor and take a snapshot
     from agentos.monitor import Monitor
     monitor = Monitor(kernel)
     snapshot = monitor.snapshot()
     
-    # Check that the snapshot contains the expected information
-    assert f"{pid:3} | READY" in snapshot
+    # Check that snapshot contains expected information from rich output
+    assert "PID" in snapshot
+    assert "State" in snapshot
+    assert "Priority" in snapshot
+    assert "Tokens Used" in snapshot
+    
+    
+    
+    

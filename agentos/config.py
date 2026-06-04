@@ -10,3 +10,5 @@ class KernelConfig:
     total_token_budget: int = 200_000
     default_model: str = "llama3.2"
     ollama_host: str = "http://localhost:11434"
+    token_cost_usd: float = 0.0001
+    

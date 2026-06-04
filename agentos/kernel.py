@@ -52,8 +52,8 @@ class Kernel:
     def run(self, until_idle=True):
        # Local import avoids a circular import: syscalls.py imports Kernel.
        from agentos.syscalls import SyscallContext
-
-       cores = self.config.get("cores", 1)
+       
+       cores = self.config.get("cores", 4)
        boost_interval = self.config.get("boost_interval", 20)
        steps = 0
        while True:

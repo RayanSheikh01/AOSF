@@ -31,7 +31,6 @@ class Monitor:
     def snapshot(self) -> str:
         columns = ["PID", "State", "Priority", "Tokens Used/Budget", "Cost USD", "Mailbox Depth"]
         rows = self._rows()
-
         if Console is None:
             return self._plain_table(columns, rows)
 
