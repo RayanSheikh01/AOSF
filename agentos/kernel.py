@@ -2,25 +2,30 @@
 
 import asyncio
 from collections import deque
+from typing import Optional
 
 from agentos.ipc import Broker
 from agentos.process import Agent, AgentControlBlock, AgentState
 from agentos.scheduler import SchedulerPolicy
 from agentos.memory.store import SharedStore
 from agentos.monitor import Monitor
+from agentos.tools import ToolRegistry
 
 
 class Kernel:
 
-    def __init__(self, config, scheduler_policy: SchedulerPolicy):
+    def __init__(self, config, scheduler_policy: SchedulerPolicy, tools: Optional[ToolRegistry] = None):
         self.config = config
         self.scheduler_policy = scheduler_policy
+        self.tools = tools
         self.agents: dict[int, Agent] = {}
         self.agent_control_blocks: dict[int, AgentControlBlock] = {}
         self.next_pid = 1
+        
 
         # IPC state
         self.broker = Broker()
+        
         
 
 
@@ -80,4 +85,5 @@ class Kernel:
                    self.scheduler_policy.on_yield(next_acb)
                elif step_result.kind == "done":
                    next_acb.transition_state(AgentState.TERMINATED)
+                   
                 

@@ -26,8 +26,13 @@ class ToolRegistry:
         return tool
     
     
-def call_tool(tool_registry: ToolRegistry, tool_name: str, **kwargs) -> dict:
+async def call_tool(tool_registry: ToolRegistry, tool_name: str, **kwargs) -> dict:
     tool = tool_registry.get(tool_name)
-    return asyncio.run(tool.run(**kwargs))
+    return await tool.run(**kwargs)
 
-
+class EchoTool(Tool):
+    name = "echo"
+    description = "Returns the input arguments as output."
+    
+    async def run(self, **kwargs) -> dict:
+        return kwargs

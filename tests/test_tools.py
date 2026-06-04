@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from agentos.tools import ToolRegistry
@@ -15,10 +17,19 @@ def test_tools():
             return {"result": a + b}
     tool_registry = ToolRegistry()
     tool_registry.register(Adder())
-    result = call_tool(tool_registry, "adder", a=2, b=3)
+    result = asyncio.run(call_tool(tool_registry, "adder", a=2, b=3))
     assert result == {"result": 5}
     with pytest.raises(ValueError):
-        call_tool(tool_registry, "nonexistent_tool")
+        asyncio.run(call_tool(tool_registry, "nonexistent_tool"))
+    
+    
+def test_echo_tool():
+    from agentos.tools import EchoTool, call_tool
+    
+    tool_registry = ToolRegistry()
+    tool_registry.register(EchoTool())
+    result = asyncio.run(call_tool(tool_registry, "echo", x=42, y="hello"))
+    assert result == {"x": 42, "y": "hello"}
         
     
     
