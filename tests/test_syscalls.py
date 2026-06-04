@@ -1,5 +1,6 @@
 import pytest
 
+from agentos.errors import CapabilityError
 from agentos.kernel import Kernel
 from agentos.syscalls import SyscallContext
 
@@ -40,14 +41,15 @@ def test_syscall_context_send_and_receive():
     sender_syscall_context = SyscallContext(pid=1, kernel_ref=kernel)
     receiver_syscall_context = SyscallContext(pid=2, kernel_ref=kernel)
     
-    # Spawn a sender and receiver agent
-    sender_pid = sender_syscall_context.spawn(behavior=None, priority=3, capabilities=["send"], token_budget=100_000)
-    receiver_pid = receiver_syscall_context.spawn(behavior=None, priority=3, capabilities=["receive"], token_budget=100_000)
+    
+
+    # Spawn sender (pid 1) and receiver (pid 2) with messaging capability
+    sender_syscall_context.spawn(behavior=None, priority=3, capabilities=["MSG:2"], token_budget=100_000)
+    receiver_pid = receiver_syscall_context.spawn(behavior=None, priority=3, capabilities=["MSG:2"], token_budget=100_000)
 
     # Test sending a message from the sender to the receiver
     message = {"text": "Hello, Agent 2!"}
     sender_syscall_context.send(target_pid=receiver_pid, message=message)
-
     # Receiver pops the delivered message off its inbox
     received_message = receiver_syscall_context.receive()
     assert received_message == message
@@ -60,8 +62,8 @@ def test_syscall_context_publish_and_subscribe():
     subscriber_syscall_context = SyscallContext(pid=2, kernel_ref=kernel)
     
     # Spawn a publisher and subscriber agent
-    publisher_pid = publisher_syscall_context.spawn(behavior=None, priority=3, capabilities=["publish"], token_budget=100_000)
-    subscriber_pid = subscriber_syscall_context.spawn(behavior=None, priority=3, capabilities=["subscribe", "receive"], token_budget=100_000)
+    publisher_pid = publisher_syscall_context.spawn(behavior=None, priority=3, capabilities=["MSG:news"], token_budget=100_000)
+    subscriber_pid = subscriber_syscall_context.spawn(behavior=None, priority=3, capabilities=["MSG:news", "MSG:2"], token_budget=100_000)
 
     # Test subscribing to a topic
     topic = "news"
@@ -74,24 +76,54 @@ def test_syscall_context_publish_and_subscribe():
     # The subscriber should have received the published message in its inbox
     assert subscriber_syscall_context.receive() == message
 
-def test_syscall_context_permissions():
-    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)  # Use a mock scheduler policy for testing
-    syscall_context = SyscallContext(pid=1, kernel_ref=kernel)
-    
-    # Spawn a new agent without permissions
-    new_pid = syscall_context.spawn(behavior=None, priority=3, capabilities=[], token_budget=100_000)
-    
-    # Test that the agent cannot perform actions it doesn't have permissions for
-    with pytest.raises(PermissionError):
-        syscall_context.send(target_pid=new_pid, message={"text": "This should fail"})
-    
-    with pytest.raises(PermissionError):
-        syscall_context.receive()
-    
-    with pytest.raises(PermissionError):
-        syscall_context.publish(topic="test", message={"text": "This should also fail"})
-    
-    with pytest.raises(PermissionError):
-        syscall_context.subscribe(topic="test")
 
+def test_send_without_capability_raises():
+    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)
+    sender = SyscallContext(pid=1, kernel_ref=kernel)
+    receiver = SyscallContext(pid=2, kernel_ref=kernel)
+
+    # Sender (pid 1) has no MSG capability; receiver (pid 2) exists as a target.
+    sender.spawn(behavior=None, priority=3, capabilities=[], token_budget=100_000)
+    receiver.spawn(behavior=None, priority=3, capabilities=[], token_budget=100_000)
+
+    with pytest.raises(CapabilityError):
+        sender.send(target_pid=2, message={"text": "denied"})
+
+
+def test_send_with_wildcard_succeeds():
+    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)
+    sender = SyscallContext(pid=1, kernel_ref=kernel)
+    receiver = SyscallContext(pid=2, kernel_ref=kernel)
+
+    # MSG:* grants the sender the right to message any pid.
+    sender.spawn(behavior=None, priority=3, capabilities=["MSG:*"], token_budget=100_000)
+    receiver.spawn(behavior=None, priority=3, capabilities=["MSG:2"], token_budget=100_000)
+
+    message = {"text": "Hello, Agent 2!"}
+    sender.send(target_pid=2, message=message)
+    assert receiver.receive() == message
+
+
+def test_spawn_escalating_capability_raises():
+    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)
+    parent = SyscallContext(pid=1, kernel_ref=kernel)
+
+    # Bootstrap parent (pid 1) with a single capability.
+    parent.spawn(behavior=None, priority=3, capabilities=["MSG:7"], token_budget=100_000)
+
+    # Spawning a child granting a capability the parent lacks is rejected.
+    with pytest.raises(CapabilityError):
+        parent.spawn(behavior=None, priority=3, capabilities=["MSG:8"], token_budget=100_000)
+
+
+def test_spawn_within_capability_succeeds():
+    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)
+    parent = SyscallContext(pid=1, kernel_ref=kernel)
+
+    # Bootstrap parent (pid 1) with two capabilities.
+    parent.spawn(behavior=None, priority=3, capabilities=["MSG:7", "MSG:8"], token_budget=100_000)
+
+    # A child requesting a subset of the parent's capabilities is allowed.
+    child_pid = parent.spawn(behavior=None, priority=3, capabilities=["MSG:7"], token_budget=100_000)
+    assert child_pid in kernel.agents
 

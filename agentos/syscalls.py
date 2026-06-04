@@ -1,5 +1,7 @@
 from typing import Optional
 
+
+
 from agentos import permissions
 from agentos.permissions import CapabilitySet
 from agentos.errors import CapabilityError, SegmentError
@@ -20,6 +22,10 @@ class SyscallContext:
 
     # -- internal helpers ---------------------------------------------------
 
+   
+
+
+    
     def _caller_acb(self):
         try:
             return self.kernel_ref.agent_control_blocks[self.pid]
@@ -27,20 +33,28 @@ class SyscallContext:
             raise PermissionError(f"No such acting agent: pid {self.pid}")
 
     def _require(self, capability: str):
-        """Raise PermissionError if the calling agent lacks `capability`."""
+        """Raise CapabilityError if the calling agent lacks `capability`."""
         acb = self._caller_acb()
         caps = CapabilitySet(acb.capabilities)
-        try:
-            permissions.require(caps, capability)
-        except CapabilityError as exc:
-            raise PermissionError(
-                f"Agent {self.pid} lacks capability '{capability}'"
-            ) from exc
+        permissions.require(caps, capability)
 
     # -- process control (ungated bootstrap syscalls) -----------------------
 
     def spawn(self, behavior: StepResult, priority: int = 3, capabilities: list[str] = [], token_budget: int = 100_000) -> int:
-        """Spawn a new agent with the given behavior and return its PID."""
+        """Spawn a new agent with the given behavior and return its PID.
+
+        An agent cannot grant its child a capability it does not itself hold;
+        the child's capability set must be a subset of the caller's. The
+        bootstrap case (caller not yet registered) is exempt and acts as root."""
+        parent_acb = self.kernel_ref.agent_control_blocks.get(self.pid)
+        if parent_acb is not None:
+            parent_caps = CapabilitySet(parent_acb.capabilities)
+            requested = CapabilitySet(capabilities)
+            if not requested.subset_of(parent_caps):
+                raise CapabilityError(
+                    f"Agent {self.pid} cannot grant capabilities it lacks: "
+                    f"{sorted(requested.capabilities - parent_caps.capabilities)}"
+                )
         return self.kernel_ref.spawn(
             behavior=behavior,
             priority=priority,
@@ -61,15 +75,16 @@ class SyscallContext:
     # -- messaging ----------------------------------------------------------
 
     def send(self, target_pid: int, message: dict):
-        """Send a message to another agent's inbox."""
-        self._require("send")
+        """Send a message to another agent's inbox."""        
+        self._require(f"MSG:{target_pid}")
         if target_pid not in self.kernel_ref.agents:
             raise ValueError(f"Target PID {target_pid} does not exist")
+        
         self.kernel_ref.inboxes[target_pid].append(message)
 
     def receive(self) -> Optional[dict]:
         """Pop the next message from this agent's inbox, or None if empty."""
-        self._require("receive")
+        self._require(f"MSG:{self.pid}")
         inbox = self.kernel_ref.inboxes.get(self.pid)
         if inbox:
             return inbox.popleft()
@@ -79,7 +94,7 @@ class SyscallContext:
 
     def publish(self, topic: str, message: dict):
         """Publish a message to every subscriber of `topic`."""
-        self._require("publish")
+        self._require(f"MSG:{topic}")
         for subscriber_pid in self.kernel_ref.topics.get(topic, set()):
             inbox = self.kernel_ref.inboxes.get(subscriber_pid)
             if inbox is not None:
@@ -87,14 +102,14 @@ class SyscallContext:
 
     def subscribe(self, topic: str):
         """Subscribe the calling agent to `topic`."""
-        self._require("subscribe")
+        self._require(f"MSG:{topic}")
         self.kernel_ref.topics.setdefault(topic, set()).add(self.pid)
 
     # -- memory -------------------------------------------------------------
 
     def mem_alloc(self, size: int) -> int:
         """Allocate a block of memory and return its base address."""
-        self._require("mem_alloc")
+        self._require(f"MEM:{size}")
         address = self.kernel_ref.next_address
         self.kernel_ref.next_address += size
         self.kernel_ref.memory[address] = bytearray(size)
@@ -102,13 +117,13 @@ class SyscallContext:
 
     def mem_attach(self, address: int):
         """Validate that a block exists at `address`."""
-        self._require("mem_attach")
+        self._require(f"MEM:{address}")
         if address not in self.kernel_ref.memory:
             raise SegmentError(f"No memory block at address {hex(address)}")
 
     def mem_read(self, address: int, size: int) -> bytes:
         """Read `size` bytes from the block at `address`."""
-        self._require("mem_read")
+        self._require(f"MEM:{address}")
         block = self.kernel_ref.memory.get(address)
         if block is None:
             raise SegmentError(f"No memory block at address {hex(address)}")
@@ -116,7 +131,7 @@ class SyscallContext:
 
     def mem_write(self, address: int, data: bytes):
         """Write `data` into the block at `address`."""
-        self._require("mem_write")
+        self._require(f"MEM:{address}")
         block = self.kernel_ref.memory.get(address)
         if block is None:
             raise SegmentError(f"No memory block at address {hex(address)}")
@@ -128,7 +143,7 @@ class SyscallContext:
 
     def mem_free(self, address: int):
         """Free the block at `address`."""
-        self._require("mem_free")
+        self._require(f"MEM:{address}")
         if self.kernel_ref.memory.pop(address, None) is None:
             raise SegmentError(f"No memory block at address {hex(address)}")
 
@@ -136,11 +151,11 @@ class SyscallContext:
 
     def request_tokens(self, amount: int):
         """Add `amount` tokens to the calling agent's budget."""
-        self._require("request_tokens")
+        self._require(f"TOKENS:{amount}")
         self._caller_acb().token_budget += amount
 
     def call_tool(self, tool_name: str, args: dict) -> dict:
         """Call an external tool and return its result."""
-        self._require("call_tool")
+        self._require(f"TOOL:{tool_name}")
         # Placeholder dispatch: a real kernel would route to a tool registry.
         return {"result": "success", "tool": tool_name, "args": args}
