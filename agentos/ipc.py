@@ -22,6 +22,15 @@ class Mailbox:
             return self.messages.pop(0)
         return None
     
+    def add(self, message: Message):
+        self.messages.append(message)
+        
+    def remove_index(self, index: int) -> Message:
+        return self.messages.pop(index)
+
+    def depth(self) -> int:
+        return len(self.messages)
+    
 class Broker:
     def __init__(self, mailboxes: dict[int, Mailbox] = None, topics: dict[str, set[int]] = None):
         self.mailboxes: dict[int, Mailbox] = mailboxes if mailboxes is not None else {}

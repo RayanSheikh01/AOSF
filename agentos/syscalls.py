@@ -3,8 +3,9 @@ from typing import Optional
 
 
 from agentos import permissions
+from agentos.ipc import Message
 from agentos.permissions import CapabilitySet
-from agentos.errors import CapabilityError, SegmentError
+from agentos.errors import CapabilityError
 from agentos.kernel import Kernel
 from agentos.process import AgentState, StepResult
 
@@ -74,78 +75,64 @@ class SyscallContext:
 
     # -- messaging ----------------------------------------------------------
 
-    def send(self, target_pid: int, message: dict):
+    def send(self, target_pid: int, message: Message):
         """Send a message to another agent's inbox."""        
         self._require(f"MSG:{target_pid}")
         if target_pid not in self.kernel_ref.agents:
             raise ValueError(f"Target PID {target_pid} does not exist")
         
-        self.kernel_ref.inboxes[target_pid].append(message)
-
-    def receive(self) -> Optional[dict]:
+        self.kernel_ref.broker.mailboxes[target_pid].add(message)
+        
+    def receive(self):
         """Pop the next message from this agent's inbox, or None if empty."""
         self._require(f"MSG:{self.pid}")
-        inbox = self.kernel_ref.inboxes.get(self.pid)
-        if inbox:
-            return inbox.popleft()
+        inbox = self.kernel_ref.broker.mailboxes.get(self.pid)
+        if inbox is not None:
+            return inbox.receive()
         return None
+    
 
     # -- pub/sub ------------------------------------------------------------
 
-    def publish(self, topic: str, message: dict):
+    def publish(self, topic: str, message: Message):
         """Publish a message to every subscriber of `topic`."""
         self._require(f"MSG:{topic}")
-        for subscriber_pid in self.kernel_ref.topics.get(topic, set()):
-            inbox = self.kernel_ref.inboxes.get(subscriber_pid)
+        for subscriber_pid in self.kernel_ref.broker.topics.get(topic, set()):
+            inbox = self.kernel_ref.broker.mailboxes.get(subscriber_pid)
             if inbox is not None:
-                inbox.append(message)
+                inbox.add(message)
 
     def subscribe(self, topic: str):
         """Subscribe the calling agent to `topic`."""
         self._require(f"MSG:{topic}")
-        self.kernel_ref.topics.setdefault(topic, set()).add(self.pid)
+        self.kernel_ref.broker.topics.setdefault(topic, set()).add(self.pid)
 
     # -- memory -------------------------------------------------------------
 
-    def mem_alloc(self, size: int) -> int:
-        """Allocate a block of memory and return its base address."""
-        self._require(f"MEM:{size}")
-        address = self.kernel_ref.next_address
-        self.kernel_ref.next_address += size
-        self.kernel_ref.memory[address] = bytearray(size)
-        return address
+    def mem_alloc(self, name: str):
+        """Open a shared segment owned by the calling agent."""
+        self._require(f"MEM:{name}")
+        self.kernel_ref.store.alloc(name, self.pid)
 
-    def mem_attach(self, address: int):
-        """Validate that a block exists at `address`."""
-        self._require(f"MEM:{address}")
-        if address not in self.kernel_ref.memory:
-            raise SegmentError(f"No memory block at address {hex(address)}")
+    def mem_attach(self, name: str):
+        """Attach to an existing segment; returns its current value."""
+        self._require(f"MEM:{name}")
+        return self.kernel_ref.store.attach(name, self.pid)
 
-    def mem_read(self, address: int, size: int) -> bytes:
-        """Read `size` bytes from the block at `address`."""
-        self._require(f"MEM:{address}")
-        block = self.kernel_ref.memory.get(address)
-        if block is None:
-            raise SegmentError(f"No memory block at address {hex(address)}")
-        return bytes(block[:size])
+    def mem_read(self, name: str):
+        """Read the value of a shared segment."""
+        self._require(f"MEM:{name}")
+        return self.kernel_ref.store.read(name, self.pid)
 
-    def mem_write(self, address: int, data: bytes):
-        """Write `data` into the block at `address`."""
-        self._require(f"MEM:{address}")
-        block = self.kernel_ref.memory.get(address)
-        if block is None:
-            raise SegmentError(f"No memory block at address {hex(address)}")
-        if len(data) > len(block):
-            raise SegmentError(
-                f"Write of {len(data)} bytes exceeds block size {len(block)}"
-            )
-        block[: len(data)] = data
+    def mem_write(self, name: str, value):
+        """Write a value to a shared segment (owner-only, enforced by store)."""
+        self._require(f"MEM:{name}")
+        self.kernel_ref.store.write(name, self.pid, value)
 
-    def mem_free(self, address: int):
-        """Free the block at `address`."""
-        self._require(f"MEM:{address}")
-        if self.kernel_ref.memory.pop(address, None) is None:
-            raise SegmentError(f"No memory block at address {hex(address)}")
+    def mem_free(self, name: str):
+        """Release the calling agent's reference to a shared segment."""
+        self._require(f"MEM:{name}")
+        self.kernel_ref.store.free(name, self.pid)
 
     # -- resources ----------------------------------------------------------
 

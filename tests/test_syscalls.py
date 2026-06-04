@@ -1,6 +1,6 @@
 import pytest
 
-from agentos.errors import CapabilityError
+from agentos.errors import CapabilityError, SegmentError
 from agentos.kernel import Kernel
 from agentos.syscalls import SyscallContext
 
@@ -126,4 +126,37 @@ def test_spawn_within_capability_succeeds():
     # A child requesting a subset of the parent's capabilities is allowed.
     child_pid = parent.spawn(behavior=None, priority=3, capabilities=["MSG:7"], token_budget=100_000)
     assert child_pid in kernel.agents
+
+
+def test_mem_alloc_without_capability_raises():
+    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)
+    owner = SyscallContext(pid=1, kernel_ref=kernel)
+
+    # Agent has no MEM capability for the segment.
+    owner.spawn(behavior=None, priority=3, capabilities=[], token_budget=100_000)
+
+    with pytest.raises(CapabilityError):
+        owner.mem_alloc("findings")
+
+
+def test_mem_alloc_write_read_round_trips_via_store():
+    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)
+    owner = SyscallContext(pid=1, kernel_ref=kernel)
+
+    owner.spawn(behavior=None, priority=3, capabilities=["MEM:findings"], token_budget=100_000)
+
+    owner.mem_alloc("findings")
+    owner.mem_write("findings", {"x": 1})
+    assert owner.mem_read("findings") == {"x": 1}
+    # Routed to the kernel's shared store, not a private bytearray dict.
+    assert kernel.store.read("findings", 1) == {"x": 1}
+
+
+def test_mem_read_missing_segment_raises():
+    kernel = Kernel(config={"cores": 1, "boost_interval": 10}, scheduler_policy=None)
+    owner = SyscallContext(pid=1, kernel_ref=kernel)
+    owner.spawn(behavior=None, priority=3, capabilities=["MEM:findings"], token_budget=100_000)
+
+    with pytest.raises(SegmentError):
+        owner.mem_read("findings")
 

@@ -23,9 +23,6 @@ class Kernel:
         self.broker = Broker()
         
 
-        # Memory state: address -> bytearray block
-        self.memory: dict[int, bytearray] = {}
-        self.next_address = 0x1000
 
         # Shared key/value store (named segments) for cross-agent findings.
         self.store = SharedStore()
@@ -83,5 +80,4 @@ class Kernel:
                    self.scheduler_policy.on_yield(next_acb)
                elif step_result.kind == "done":
                    next_acb.transition_state(AgentState.TERMINATED)
-                   self.broker.spawn(next_acb.pid)
                 

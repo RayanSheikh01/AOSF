@@ -17,7 +17,8 @@ class Monitor:
             tokens_used = acb.tokens_used
             tokens_budget = acb.token_budget
             cost_usd = tokens_used * self.kernel.config.get("token_cost_usd", 0.0001)
-            mailbox_depth = len(self.kernel.broker.mailboxes.get(pid, []))
+            mailbox = self.kernel.broker.mailboxes.get(pid)
+            mailbox_depth = mailbox.depth() if mailbox is not None else 0
             rows.append((
                 str(pid),
                 state,

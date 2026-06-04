@@ -1,41 +1,49 @@
+from agentos.errors import SegmentError
+
+
 class SharedStore:
+    """In-memory key/value store of named segments shared between agents.
+
+    Each segment is ``{owner, value, refs}``. ``alloc`` opens a segment with
+    one reference (the owner's); ``attach`` adds a reference; ``free`` drops
+    one and reclaims the segment when the count reaches zero.
     """
-    A simple in-memory key-value store for sharing data between agents.
-    """
+
     def __init__(self):
         self.store = {}
 
+    def _segment(self, name):
+        seg = self.store.get(name)
+        if seg is None:
+            raise SegmentError(f"Shared segment '{name}' does not exist")
+        return seg
+
     def alloc(self, name, owner_pid):
-        """Allocate a new shared variable with the given name, owned by owner_pid."""
+        """Open a new segment owned by ``owner_pid``. Duplicate name fails."""
         if name in self.store:
-            raise ValueError(f"Shared variable '{name}' already exists")
-        self.store[name] = {"owner": owner_pid, "value": None}
-    
+            raise SegmentError(f"Shared segment '{name}' already exists")
+        self.store[name] = {"owner": owner_pid, "value": None, "refs": 1}
+
     def attach(self, name, pid):
-        """Attach to an existing shared variable. Returns the current value."""
-        if name not in self.store:
-            raise ValueError(f"Shared variable '{name}' does not exist")
-        return self.store[name]["value"]
-    
+        """Add a reference to an existing segment. Returns the current value."""
+        seg = self._segment(name)
+        seg["refs"] += 1
+        return seg["value"]
+
     def read(self, name, pid):
-        """Read the value of a shared variable."""
-        if name not in self.store:
-            raise ValueError(f"Shared variable '{name}' does not exist")
-        return self.store[name]["value"]
-    
+        """Read the value of a segment."""
+        return self._segment(name)["value"]
+
     def write(self, name, pid, value):
-        """Write a new value to a shared variable. Only the owner can write."""
-        if name not in self.store:
-            raise ValueError(f"Shared variable '{name}' does not exist")
-        if self.store[name]["owner"] != pid:
-            raise PermissionError(f"PID {pid} is not the owner of shared variable '{name}'")
-        self.store[name]["value"] = value
+        """Write a new value to a segment. Only the owner may write."""
+        seg = self._segment(name)
+        if seg["owner"] != pid:
+            raise SegmentError(f"PID {pid} is not the owner of segment '{name}'")
+        seg["value"] = value
 
     def free(self, name, pid):
-        """Free a shared variable. Only the owner can free."""
-        if name not in self.store:
-            raise ValueError(f"Shared variable '{name}' does not exist")
-        if self.store[name]["owner"] != pid:
-            raise PermissionError(f"PID {pid} is not the owner of shared variable '{name}'")
-        del self.store[name]
-        
+        """Drop a reference; reclaim the segment when the count hits zero."""
+        seg = self._segment(name)
+        seg["refs"] -= 1
+        if seg["refs"] <= 0:
+            del self.store[name]
